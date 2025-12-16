@@ -108,12 +108,74 @@ mod tests {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct Position(i32, i32);
 
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    struct Dialogue {
+        greeting: String,
+    }
+
     #[test]
-    fn insert_one() {
+    fn insert_get() {
         let mut manager = ComponentManager::default();
         let player = "Player";
         let position = Position(3, -5);
         manager.insert(player, position);
         assert_eq!(manager.get(&player), Some(&position));
+    }
+
+    #[test]
+    fn bad_get() {
+        let mut manager = ComponentManager::default();
+
+        let player = "Player";
+        let position = Position(3, -5);
+
+        let npc = "Gale";
+        let dialogue = Dialogue {
+            greeting: "The Orb.".to_string(),
+        };
+
+        manager.insert(player, position);
+        manager.insert(npc, dialogue);
+
+        assert_eq!(manager.get::<Position>(&npc), None);
+        assert_eq!(manager.get::<Dialogue>(&player), None);
+    }
+
+    #[test]
+    fn bad_get_empty() {
+        let manager = ComponentManager::default();
+
+        let player = "Player";
+        let npc = "Gale";
+
+        assert_eq!(manager.get::<Position>(&npc), None);
+        assert_eq!(manager.get::<Dialogue>(&player), None);
+    }
+
+    #[test]
+    fn get_mut() {
+        let mut manager = ComponentManager::default();
+
+        let player = "Player";
+        let position = Position(3, -5);
+
+        let npc = "Gale";
+        let dialogue = Dialogue {
+            greeting: "The Orb.".to_string(),
+        };
+
+        manager.insert(player, position);
+        manager.insert(npc, dialogue);
+
+        let new_dialogue = Dialogue {
+            greeting: "The Karsite Weave.".to_string(),
+        };
+
+        {
+            let dialogue_mut = manager.get_mut::<Dialogue>(&npc).unwrap();
+            *dialogue_mut = new_dialogue.clone();
+        }
+
+        assert_eq!(manager.get::<Dialogue>(&npc), Some(&new_dialogue));
     }
 }
