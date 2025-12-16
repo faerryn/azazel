@@ -1,5 +1,6 @@
-use crate::opaque_value_hash_map::OpaqueValueHashMap;
 use std::{any::TypeId, collections::HashMap, hash::Hash};
+
+use crate::opaque_value_hash_map::OpaqueValueHashMap;
 
 #[derive(Default)]
 pub struct ComponentManager<E> {
