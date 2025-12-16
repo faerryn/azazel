@@ -9,6 +9,7 @@ use crate::ComponentManager;
 pub struct SystemManager<E> {
     systems: Vec<Box<dyn OpaqueSystem<E>>>,
     pub cm: Arc<Mutex<ComponentManager<E>>>,
+    // TODO: cm shouldn't be public, expose a better inerface
 }
 
 impl<E: Eq + Hash + 'static> SystemManager<E> {
