@@ -1,17 +1,11 @@
 use std::{
     any::{Any, TypeId},
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     hash::Hash,
 };
 
 #[derive(Default)]
-pub struct Engine<E> {
-    entities: HashSet<E>,
-    components: ComponentManager<E>,
-}
-
-#[derive(Default)]
-struct ComponentManager<E> {
+pub struct ComponentManager<E> {
     storage: HashMap<TypeId, Box<dyn OpaqueHashMap<E>>>,
 }
 
