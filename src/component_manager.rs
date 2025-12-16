@@ -19,7 +19,7 @@ impl<E: Eq + Hash + 'static> ComponentManager<E> {
     }
 
     // Components stuff
-    fn c_get_mut<C: 'static>(&mut self) -> Option<&mut HashMap<E, C>> {
+    pub(crate) fn c_get_mut<C: 'static>(&mut self) -> Option<&mut HashMap<E, C>> {
         self.storage.get_mut(&TypeId::of::<C>()).map(|store| {
             store
                 .as_any_mut()

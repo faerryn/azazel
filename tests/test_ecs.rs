@@ -1,19 +1,31 @@
 #[cfg(test)]
 mod tests {
-    use azazel::{ComponentManager, EntityManager};
+    use azazel::{EntityManager, SystemManager};
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct Name(String);
 
     #[test]
-    fn test_entity_component_manager() {
+    fn test_ecs() {
         let mut em = EntityManager::default();
-        let mut cm = ComponentManager::default();
+        let mut sm = SystemManager::<usize>::default();
 
         let player = *em.spawn();
-        let name = Name("Johnny Silverhand".to_string());
+        sm.cm
+            .lock()
+            .unwrap()
+            .insert::<Name>(player, Name("Johnny Silverhand".to_string()));
 
-        cm.insert(player, name.clone());
-        assert_eq!(cm.get(&player), Some(&name));
+        sm.insert::<Name, _>(|names: &mut [Name]| {
+            for name in names {
+                name.0.push_str(" the VI");
+            }
+        });
+        sm.run_systems();
+
+        assert_eq!(
+            sm.cm.lock().unwrap().get(&player),
+            Some(&Name("Johnny Silverhand the VI".to_string()))
+        );
     }
 }
