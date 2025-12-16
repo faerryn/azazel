@@ -1,43 +1,9 @@
-use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
-    hash::Hash,
-};
+use crate::opaque_value_hash_map::OpaqueValueHashMap;
+use std::{any::TypeId, collections::HashMap, hash::Hash};
 
 #[derive(Default)]
 pub struct ComponentManager<E> {
-    storage: HashMap<TypeId, Box<dyn OpaqueHashMap<E>>>,
-}
-
-trait OpaqueHashMap<E> {
-    fn is_empty(&self) -> bool;
-    fn remove(&mut self, k: &E);
-    fn shrink_to_fit(&mut self);
-
-    fn as_any(&self) -> &dyn Any;
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-}
-
-impl<K: Eq + Hash + 'static, V: 'static> OpaqueHashMap<K> for HashMap<K, V> {
-    fn is_empty(&self) -> bool {
-        HashMap::is_empty(self)
-    }
-
-    fn remove(&mut self, k: &K) {
-        HashMap::remove(self, k);
-    }
-
-    fn shrink_to_fit(&mut self) {
-        HashMap::shrink_to_fit(self);
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
+    storage: HashMap<TypeId, Box<dyn OpaqueValueHashMap<E>>>,
 }
 
 impl<E: Eq + Hash + 'static> ComponentManager<E> {
@@ -118,8 +84,14 @@ mod tests {
         let mut manager = ComponentManager::default();
         let player = "Player";
         let position = Position(3, -5);
+
+        assert_eq!(manager.storage.len(), 0);
+
         manager.insert(player, position);
+
         assert_eq!(manager.get(&player), Some(&position));
+        assert_eq!(manager.storage.len(), 1);
+        assert_eq!(manager.c_get::<Position>().unwrap().len(), 1);
     }
 
     #[test]
