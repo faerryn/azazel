@@ -13,7 +13,7 @@ pub struct Engine<I, G> {
 }
 
 impl<I: Copy + Eq + Hash + 'static, G: Iterator<Item = I>> Engine<I, G> {
-    pub fn spawn<C: 'static>(&mut self) -> Entity<I> {
+    pub fn spawn(&mut self) -> Entity<I> {
         let id = self.entity_manager.spawn();
         Entity { id }
     }

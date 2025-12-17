@@ -77,7 +77,7 @@ pub(crate) trait OpaqueComponentStorage<I> {
     fn shrink_to_fit(&mut self);
 }
 
-impl<I: Eq + Hash, C> OpaqueComponentStorage<I> for ComponentStorage<I, C> {
+impl<I: Copy + Eq + Hash, C> OpaqueComponentStorage<I> for ComponentStorage<I, C> {
     fn is_empty(&self) -> bool {
         self.id_to_index.is_empty()
     }
@@ -103,7 +103,7 @@ pub(crate) trait AnyComponentStorage<I>: OpaqueComponentStorage<I> {
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
 
-impl<I: Eq + Hash + 'static, C: 'static> AnyComponentStorage<I> for ComponentStorage<I, C> {
+impl<I: Copy + Eq + Hash + 'static, C: 'static> AnyComponentStorage<I> for ComponentStorage<I, C> {
     fn as_any(&self) -> &dyn Any {
         self
     }

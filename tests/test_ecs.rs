@@ -8,7 +8,8 @@ mod tests {
     #[test]
     fn test_ecs() {
         let mut engine = Engine::default();
-        let player = engine.spawn(Name("Johnny Silverhand".to_string()));
+        let player = engine.spawn();
+        engine.insert_entity_component(&player, Name("Johnny Silverhand".to_string()));
 
         engine.schedule(|names: &mut [Name]| {
             for name in names {
@@ -18,13 +19,13 @@ mod tests {
 
         engine.run_systems();
         assert_eq!(
-            engine.entity_get_component(&player),
+            engine.get_entity_component(&player),
             Some(&Name("Johnny Silverhand the VI".to_string()))
         );
 
         engine.run_systems();
         assert_eq!(
-            engine.entity_get_component(&player),
+            engine.get_entity_component(&player),
             Some(&Name("Johnny Silverhand the VI the VI".to_string()))
         );
     }
