@@ -20,6 +20,7 @@ impl<I: Copy + Eq + Hash + 'static, G: Iterator<Item = I>> Engine<I, G> {
     }
 
     pub fn despawn(&mut self, entity: Entity<I>) {
+        self.component_manager.remove_entity(&entity.id);
         self.entity_manager.despawn(entity.id)
     }
 

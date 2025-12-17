@@ -46,7 +46,7 @@ impl<I: Copy + Eq + Hash + 'static, C: 'static, S: Fn(&mut [C]) + 'static> Opaqu
 {
     fn run(&self, component_manager: &mut ComponentManager<I>) {
         if let Some(components) = component_manager.c_get_mut::<C>() {
-            for c in &mut components.data {
+            for c in components.as_mut_slice() {
                 (self.call)(std::slice::from_mut(c));
             }
         }

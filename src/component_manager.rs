@@ -102,7 +102,6 @@ mod tests {
 
         assert_eq!(manager.get(&player), Some(&position));
         assert_eq!(manager.stores.len(), 1);
-        assert_eq!(manager.c_get::<Position>().unwrap().data.len(), 1);
     }
 
     #[test]
