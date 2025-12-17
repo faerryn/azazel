@@ -3,45 +3,45 @@ use std::{any::TypeId, hash::Hash, marker::PhantomData};
 use crate::ComponentManager;
 
 #[derive(Default)]
-pub struct SystemManager<I> {
-    systems: Vec<Box<dyn OpaqueSystem<I>>>,
+pub struct SystemManager<Id> {
+    systems: Vec<Box<dyn OpaqueSystem<Id>>>,
 }
 
-impl<I: Copy + Eq + Hash + 'static> SystemManager<I> {
-    pub fn insert<S, Input>(&mut self, system: S)
+impl<Id: Copy + Eq + Hash + 'static> SystemManager<Id> {
+    pub fn schedule<F, Input>(&mut self, system: F)
     where
-        S: IntoOpaqueSystem<I, Input>,
-        <S as IntoOpaqueSystem<I, Input>>::System: 'static,
+        F: IntoOpaqueSystem<Id, Input>,
+        <F as IntoOpaqueSystem<Id, Input>>::System: 'static,
     {
         self.systems.push(Box::new(system.into_opaque_system()))
     }
 
-    pub fn run_systems(&self, component_manager: &mut ComponentManager<I>) {
+    pub fn run_systems(&self, component_manager: &mut ComponentManager<Id>) {
         for system in &self.systems {
             system.run(component_manager);
         }
     }
 }
 
-pub(crate) struct System<Input, S> {
-    call: S,
+pub(crate) struct System<Input, F> {
+    call: F,
     _signature: PhantomData<Input>,
 }
 
-pub(crate) trait IntoOpaqueSystem<I, Input> {
-    type System: OpaqueSystem<I>;
+pub(crate) trait IntoOpaqueSystem<Id, Input> {
+    type System: OpaqueSystem<Id>;
 
     fn into_opaque_system(self) -> Self::System;
 }
 
-trait OpaqueSystem<I> {
-    fn run(&self, component_manager: &mut ComponentManager<I>);
+trait OpaqueSystem<Id> {
+    fn run(&self, component_manager: &mut ComponentManager<Id>);
 }
 
-impl<I: Copy + Eq + Hash + 'static, C: 'static, S: Fn(&mut C) + 'static> IntoOpaqueSystem<I, (C,)>
-    for S
+impl<Id: Copy + Eq + Hash + 'static, C: 'static, F: Fn(&mut C) + 'static> IntoOpaqueSystem<Id, (C,)>
+    for F
 {
-    type System = System<(C,), S>;
+    type System = System<(C,), F>;
 
     fn into_opaque_system(self) -> Self::System {
         Self::System {
@@ -51,10 +51,10 @@ impl<I: Copy + Eq + Hash + 'static, C: 'static, S: Fn(&mut C) + 'static> IntoOpa
     }
 }
 
-impl<I: Copy + Eq + Hash + 'static, C: 'static, D: 'static, S: Fn(&mut C, &mut D) + 'static>
-    IntoOpaqueSystem<I, (C, D)> for S
+impl<Id: Copy + Eq + Hash + 'static, C: 'static, D: 'static, F: Fn(&mut C, &mut D) + 'static>
+    IntoOpaqueSystem<Id, (C, D)> for F
 {
-    type System = System<(C, D), S>;
+    type System = System<(C, D), F>;
 
     fn into_opaque_system(self) -> Self::System {
         Self::System {
@@ -64,10 +64,10 @@ impl<I: Copy + Eq + Hash + 'static, C: 'static, D: 'static, S: Fn(&mut C, &mut D
     }
 }
 
-impl<I: Copy + Eq + Hash + 'static, C: 'static, S: Fn(&mut C) + 'static> OpaqueSystem<I>
-    for System<(C,), S>
+impl<Id: Copy + Eq + Hash + 'static, C: 'static, F: Fn(&mut C) + 'static> OpaqueSystem<Id>
+    for System<(C,), F>
 {
-    fn run(&self, component_manager: &mut ComponentManager<I>) {
+    fn run(&self, component_manager: &mut ComponentManager<Id>) {
         if let Some(components) = component_manager.get_mut_store::<C>() {
             for c in components.as_mut_slice() {
                 (self.call)(c);
@@ -76,10 +76,10 @@ impl<I: Copy + Eq + Hash + 'static, C: 'static, S: Fn(&mut C) + 'static> OpaqueS
     }
 }
 
-impl<I: Copy + Eq + Hash + 'static, C: 'static, D: 'static, S: Fn(&mut C, &mut D) + 'static>
-    OpaqueSystem<I> for System<(C, D), S>
+impl<Id: Copy + Eq + Hash + 'static, C: 'static, D: 'static, F: Fn(&mut C, &mut D) + 'static>
+    OpaqueSystem<Id> for System<(C, D), F>
 {
-    fn run(&self, component_manager: &mut ComponentManager<I>) {
+    fn run(&self, component_manager: &mut ComponentManager<Id>) {
         let mut result = component_manager.query(&[TypeId::of::<C>(), TypeId::of::<D>()]);
         let ds = result.pop().unwrap();
         let cs = result.pop().unwrap();

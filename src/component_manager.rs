@@ -4,61 +4,61 @@ use std::{
     hash::Hash,
 };
 
-use crate::component_storage::{AnyComponentStorage, ComponentStorage, OpaqueComponentStorage};
+use crate::component_storage::{AnyComponentStorage, ComponentStorage};
 
-pub(crate) struct ComponentManager<I> {
-    stores: HashMap<TypeId, Box<dyn AnyComponentStorage<I>>>,
+pub(crate) struct ComponentManager<Id> {
+    stores: HashMap<TypeId, Box<dyn AnyComponentStorage<Id>>>,
 }
 
-impl<I: Copy + Eq + Hash + 'static> ComponentManager<I> {
-    pub(crate) fn get_store<C: 'static>(&self) -> Option<&ComponentStorage<I, C>> {
+impl<Id: Copy + Eq + Hash + 'static> ComponentManager<Id> {
+    pub(crate) fn get_store<C: 'static>(&self) -> Option<&ComponentStorage<Id, C>> {
         self.stores.get(&TypeId::of::<C>()).map(|store| {
             store
                 .as_any()
-                .downcast_ref::<ComponentStorage<I, C>>()
+                .downcast_ref::<ComponentStorage<Id, C>>()
                 .expect("Type mismatch")
         })
     }
 
-    pub(crate) fn get_mut_store<C: 'static>(&mut self) -> Option<&mut ComponentStorage<I, C>> {
+    pub(crate) fn get_mut_store<C: 'static>(&mut self) -> Option<&mut ComponentStorage<Id, C>> {
         self.stores.get_mut(&TypeId::of::<C>()).map(|store| {
             store
                 .as_any_mut()
-                .downcast_mut::<ComponentStorage<I, C>>()
+                .downcast_mut::<ComponentStorage<Id, C>>()
                 .expect("Type mismatch")
         })
     }
 
-    pub(crate) fn get<C: 'static>(&self, entity: &I) -> Option<&C> {
+    pub(crate) fn get<C: 'static>(&self, entity: &Id) -> Option<&C> {
         self.get_store::<C>().and_then(|c| c.get(entity))
     }
 
-    pub(crate) fn get_mut<C: 'static>(&mut self, entity: &I) -> Option<&mut C> {
+    pub(crate) fn get_mut<C: 'static>(&mut self, entity: &Id) -> Option<&mut C> {
         self.get_mut_store::<C>().and_then(|c| c.get_mut(entity))
     }
 
-    pub(crate) fn insert<C: 'static>(&mut self, entity: I, component: C) -> Option<C> {
+    pub(crate) fn insert<C: 'static>(&mut self, entity: Id, component: C) -> Option<C> {
         self.stores
             .entry(TypeId::of::<C>())
-            .or_insert(Box::new(ComponentStorage::<I, C>::default()))
+            .or_insert(Box::new(ComponentStorage::<Id, C>::default()))
             .as_any_mut()
-            .downcast_mut::<ComponentStorage<I, C>>()
+            .downcast_mut::<ComponentStorage<Id, C>>()
             .expect("Type mismatch")
             .insert(entity, component)
     }
 
-    pub(crate) fn remove<C: 'static>(&mut self, entity: &I) -> Option<C> {
+    pub(crate) fn remove<C: 'static>(&mut self, entity: &Id) -> Option<C> {
         self.get_mut_store::<C>().and_then(|c| c.remove(entity))
     }
 
-    pub(crate) fn delete_entity_components(&mut self, entity: &I) {
+    pub(crate) fn delete_entity_components(&mut self, entity: &Id) {
         self.stores.retain(|_, store| {
             store.delete(entity);
             !store.is_empty()
         });
     }
 
-    pub(crate) fn remove_store<C: 'static>(&mut self) -> Option<ComponentStorage<I, C>> {
+    pub(crate) fn remove_store<C: 'static>(&mut self) -> Option<ComponentStorage<Id, C>> {
         // NOTE: removing non-existent stores is allowed
         self.stores
             .remove(&TypeId::of::<C>())
@@ -75,7 +75,7 @@ impl<I: Copy + Eq + Hash + 'static> ComponentManager<I> {
     fn sample_mut_store(
         &mut self,
         query: &[TypeId],
-    ) -> Vec<Option<&mut Box<dyn AnyComponentStorage<I>>>> {
+    ) -> Vec<Option<&mut Box<dyn AnyComponentStorage<Id>>>> {
         let mut unsorted: HashMap<_, _> = self.stores.iter_mut().collect();
         let mut results = vec![];
         for c in query {
@@ -89,17 +89,17 @@ impl<I: Copy + Eq + Hash + 'static> ComponentManager<I> {
             [] => vec![],
             [q1, tail @ ..] => {
                 if let Some(s1) = self.stores.get(q1) {
-                    let mut set: HashSet<I> = s1.ids().iter().copied().collect();
+                    let mut set: HashSet<Id> = s1.ids().iter().copied().collect();
                     for c in tail {
                         if let Some(store) = self.stores.get(c) {
-                            let set2: HashSet<I> = store.ids().iter().copied().collect();
+                            let set2: HashSet<Id> = store.ids().iter().copied().collect();
                             set = set.intersection(&set2).copied().collect();
                         } else {
                             return vec![];
                         }
                     }
 
-                    let ids: Vec<I> = set.into_iter().collect();
+                    let ids: Vec<Id> = set.into_iter().collect();
                     let mut all = vec![];
                     for store in self
                         .sample_mut_store(query)
@@ -124,7 +124,7 @@ impl<I: Copy + Eq + Hash + 'static> ComponentManager<I> {
     }
 }
 
-impl<I> Default for ComponentManager<I> {
+impl<Id> Default for ComponentManager<Id> {
     fn default() -> Self {
         Self {
             stores: HashMap::new(),

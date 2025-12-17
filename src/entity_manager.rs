@@ -1,17 +1,17 @@
 use std::ops::RangeFrom;
 
-pub(crate) struct EntityManager<I, G> {
-    alive: Vec<I>,
-    dead: Vec<I>,
+pub(crate) struct EntityManager<Id, G> {
+    alive: Vec<Id>,
+    dead: Vec<Id>,
     generator: G,
 }
 
-impl<I: Copy + PartialEq, G: Iterator<Item = I>> EntityManager<I, G> {
-    pub fn contains(&self, id: I) -> bool {
+impl<Id: Copy + PartialEq, G: Iterator<Item = Id>> EntityManager<Id, G> {
+    pub fn contains(&self, id: Id) -> bool {
         self.alive.contains(&id)
     }
 
-    pub fn spawn(&mut self) -> I {
+    pub fn spawn(&mut self) -> Id {
         let id = self
             .dead
             .pop()
@@ -22,7 +22,7 @@ impl<I: Copy + PartialEq, G: Iterator<Item = I>> EntityManager<I, G> {
         id
     }
 
-    pub fn despawn(&mut self, id: I) {
+    pub fn despawn(&mut self, id: Id) {
         let i = self
             .alive
             .iter()
