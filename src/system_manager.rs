@@ -7,7 +7,7 @@ pub struct SystemManager<I> {
     systems: Vec<Box<dyn OpaqueSystem<I>>>,
 }
 
-impl<I: Eq + Hash + 'static> SystemManager<I> {
+impl<I: Copy + Eq + Hash + 'static> SystemManager<I> {
     pub fn insert<C, S>(&mut self, system: S)
     where
         C: 'static,
@@ -41,7 +41,7 @@ impl<C, S> System<C, S> {
     }
 }
 
-impl<I: Eq + Hash + 'static, C: 'static, S: Fn(&mut [C]) + 'static> OpaqueSystem<I>
+impl<I: Copy + Eq + Hash + 'static, C: 'static, S: Fn(&mut [C]) + 'static> OpaqueSystem<I>
     for System<C, S>
 {
     fn run(&self, component_manager: &mut ComponentManager<I>) {

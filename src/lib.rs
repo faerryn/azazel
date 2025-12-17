@@ -4,7 +4,6 @@ mod engine;
 mod entity_manager;
 mod system_manager;
 use component_manager::ComponentManager;
-use component_storage::{ComponentStorage, OpaqueComponentStorage};
 pub use engine::{Engine, Entity};
 use entity_manager::EntityManager;
 use system_manager::SystemManager;
