@@ -1,6 +1,10 @@
-use std::{any::TypeId, collections::HashMap, hash::Hash};
+use std::{
+    any::{Any, TypeId},
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 
-use crate::component_storage::{AnyComponentStorage, ComponentStorage};
+use crate::component_storage::{AnyComponentStorage, ComponentStorage, OpaqueComponentStorage};
 
 pub(crate) struct ComponentManager<I> {
     stores: HashMap<TypeId, Box<dyn AnyComponentStorage<I>>>,
@@ -66,6 +70,57 @@ impl<I: Copy + Eq + Hash + 'static> ComponentManager<I> {
             store.shrink_to_fit();
         }
         self.stores.retain(|_, store| !store.is_empty());
+    }
+
+    fn sample_mut_store(
+        &mut self,
+        query: &[TypeId],
+    ) -> Vec<Option<&mut Box<dyn AnyComponentStorage<I>>>> {
+        let mut unsorted: HashMap<_, _> = self.stores.iter_mut().collect();
+        let mut results = vec![];
+        for c in query {
+            results.push(unsorted.remove(c));
+        }
+        results
+    }
+
+    pub(crate) fn query(&mut self, query: &[TypeId]) -> Vec<Vec<&mut dyn Any>> {
+        match query {
+            [] => vec![],
+            [q1, tail @ ..] => {
+                if let Some(s1) = self.stores.get(q1) {
+                    let mut set: HashSet<I> = s1.ids().iter().copied().collect();
+                    for c in tail {
+                        if let Some(store) = self.stores.get(c) {
+                            let set2: HashSet<I> = store.ids().iter().copied().collect();
+                            set = set.intersection(&set2).copied().collect();
+                        } else {
+                            return vec![];
+                        }
+                    }
+
+                    let ids: Vec<I> = set.into_iter().collect();
+                    let mut all = vec![];
+                    for store in self
+                        .sample_mut_store(query)
+                        .into_iter()
+                        .map(|store| store.expect("Store missing"))
+                    {
+                        all.push(
+                            store
+                                .sample_mut_any(&ids)
+                                .into_iter()
+                                .map(|c| c.expect("Broken store"))
+                                .collect(),
+                        );
+                    }
+
+                    all
+                } else {
+                    vec![]
+                }
+            }
+        }
     }
 }
 

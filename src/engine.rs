@@ -1,6 +1,6 @@
 use std::{hash::Hash, ops::RangeFrom};
 
-use crate::{ComponentManager, EntityManager, SystemManager};
+use crate::{ComponentManager, EntityManager, SystemManager, system_manager::IntoOpaqueSystem};
 
 pub struct Entity<I> {
     id: I,
@@ -52,7 +52,10 @@ impl<I: Copy + Eq + Hash + 'static, G: Iterator<Item = I>> Engine<I, G> {
         self.component_manager.remove_store::<C>();
     }
 
-    pub fn schedule<C: 'static, S: Fn(&mut [C]) + 'static>(&mut self, system: S) {
+    pub fn schedule<Input, S: IntoOpaqueSystem<I, Input>>(&mut self, system: S)
+    where
+        <S as IntoOpaqueSystem<I, Input>>::System: 'static,
+    {
         self.system_manager.insert(system);
     }
 

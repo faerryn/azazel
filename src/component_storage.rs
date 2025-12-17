@@ -75,9 +75,13 @@ pub(crate) trait OpaqueComponentStorage<I> {
     fn len(&self) -> usize;
     fn delete(&mut self, id: &I);
     fn shrink_to_fit(&mut self);
+    fn ids(&self) -> &[I];
+    fn get_any(&self, id: &I) -> Option<&dyn Any>;
+    fn get_mut_any(&mut self, id: &I) -> Option<&mut dyn Any>;
+    fn sample_mut_any(&mut self, ids: &[I]) -> Vec<Option<&mut dyn Any>>;
 }
 
-impl<I: Copy + Eq + Hash, C> OpaqueComponentStorage<I> for ComponentStorage<I, C> {
+impl<I: Copy + Eq + Hash, C: 'static> OpaqueComponentStorage<I> for ComponentStorage<I, C> {
     fn is_empty(&self) -> bool {
         self.id_to_index.is_empty()
     }
@@ -94,6 +98,32 @@ impl<I: Copy + Eq + Hash, C> OpaqueComponentStorage<I> for ComponentStorage<I, C
         self.id_to_index.shrink_to_fit();
         self.index_to_id.shrink_to_fit();
         self.components.shrink_to_fit();
+    }
+
+    fn ids(&self) -> &[I] {
+        &self.index_to_id
+    }
+
+    fn get_any(&self, id: &I) -> Option<&dyn Any> {
+        self.get(id).map(|c| c as &dyn Any)
+    }
+
+    fn get_mut_any(&mut self, id: &I) -> Option<&mut dyn Any> {
+        self.get_mut(id).map(|c| c as &mut dyn Any)
+    }
+
+    fn sample_mut_any(&mut self, ids: &[I]) -> Vec<Option<&mut dyn Any>> {
+        let mut unsorted: HashMap<_, _> = self.components.iter_mut().enumerate().collect();
+        let mut result = vec![];
+        for id in ids {
+            result.push(
+                self.id_to_index
+                    .get(id)
+                    .and_then(|i| unsorted.remove(i))
+                    .map(|c| c as _),
+            );
+        }
+        result
     }
 }
 

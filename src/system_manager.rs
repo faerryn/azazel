@@ -1,4 +1,4 @@
-use std::{hash::Hash, marker::PhantomData};
+use std::{any::TypeId, hash::Hash, marker::PhantomData};
 
 use crate::ComponentManager;
 
@@ -8,12 +8,12 @@ pub struct SystemManager<I> {
 }
 
 impl<I: Copy + Eq + Hash + 'static> SystemManager<I> {
-    pub fn insert<C, S>(&mut self, system: S)
+    pub fn insert<S, Input>(&mut self, system: S)
     where
-        C: 'static,
-        S: Fn(&mut [C]) + 'static,
+        S: IntoOpaqueSystem<I, Input>,
+        <S as IntoOpaqueSystem<I, Input>>::System: 'static,
     {
-        self.systems.push(Box::new(System::new(system)))
+        self.systems.push(Box::new(system.into_opaque_system()))
     }
 
     pub fn run_systems(&self, component_manager: &mut ComponentManager<I>) {
@@ -23,32 +23,68 @@ impl<I: Copy + Eq + Hash + 'static> SystemManager<I> {
     }
 }
 
+pub(crate) struct System<Input, S> {
+    call: S,
+    _signature: PhantomData<Input>,
+}
+
+pub(crate) trait IntoOpaqueSystem<I, Input> {
+    type System: OpaqueSystem<I>;
+
+    fn into_opaque_system(self) -> Self::System;
+}
+
 trait OpaqueSystem<I> {
     fn run(&self, component_manager: &mut ComponentManager<I>);
 }
 
-struct System<C, S> {
-    call: S,
-    _signature: PhantomData<C>,
-}
+impl<I: Copy + Eq + Hash + 'static, C: 'static, S: Fn(&mut C) + 'static> IntoOpaqueSystem<I, (C,)>
+    for S
+{
+    type System = System<(C,), S>;
 
-impl<C, S> System<C, S> {
-    fn new(call: S) -> Self {
-        Self {
-            call,
+    fn into_opaque_system(self) -> Self::System {
+        Self::System {
+            call: self,
             _signature: PhantomData,
         }
     }
 }
 
-impl<I: Copy + Eq + Hash + 'static, C: 'static, S: Fn(&mut [C]) + 'static> OpaqueSystem<I>
-    for System<C, S>
+impl<I: Copy + Eq + Hash + 'static, C: 'static, D: 'static, S: Fn(&mut C, &mut D) + 'static>
+    IntoOpaqueSystem<I, (C, D)> for S
+{
+    type System = System<(C, D), S>;
+
+    fn into_opaque_system(self) -> Self::System {
+        Self::System {
+            call: self,
+            _signature: PhantomData,
+        }
+    }
+}
+
+impl<I: Copy + Eq + Hash + 'static, C: 'static, S: Fn(&mut C) + 'static> OpaqueSystem<I>
+    for System<(C,), S>
 {
     fn run(&self, component_manager: &mut ComponentManager<I>) {
         if let Some(components) = component_manager.get_mut_store::<C>() {
             for c in components.as_mut_slice() {
-                (self.call)(std::slice::from_mut(c));
+                (self.call)(c);
             }
+        }
+    }
+}
+
+impl<I: Copy + Eq + Hash + 'static, C: 'static, D: 'static, S: Fn(&mut C, &mut D) + 'static>
+    OpaqueSystem<I> for System<(C, D), S>
+{
+    fn run(&self, component_manager: &mut ComponentManager<I>) {
+        let mut result = component_manager.query(&[TypeId::of::<C>(), TypeId::of::<D>()]);
+        let ds = result.pop().unwrap();
+        let cs = result.pop().unwrap();
+        for (c, d) in cs.into_iter().zip(ds) {
+            (self.call)(c.downcast_mut().unwrap(), d.downcast_mut().unwrap());
         }
     }
 }
