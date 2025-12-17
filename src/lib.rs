@@ -1,7 +1,10 @@
 mod component_manager;
+mod component_storage;
+mod engine;
 mod entity_manager;
-mod opaque_value_hash_map;
 mod system_manager;
-pub use component_manager::ComponentManager;
-pub use entity_manager::EntityManager;
-pub use system_manager::SystemManager;
+use component_manager::ComponentManager;
+use component_storage::{ComponentStorage, OpaqueComponentStorage};
+pub use engine::{Engine, Entity};
+use entity_manager::EntityManager;
+use system_manager::SystemManager;

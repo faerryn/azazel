@@ -1,59 +1,59 @@
 use std::{any::TypeId, collections::HashMap, hash::Hash};
 
-use crate::opaque_value_hash_map::OpaqueValueHashMap;
+use crate::{ComponentStorage, OpaqueComponentStorage};
 
 #[derive(Default)]
-pub struct ComponentManager<E> {
-    storage: HashMap<TypeId, Box<dyn OpaqueValueHashMap<E>>>,
+pub struct ComponentManager<I> {
+    storage: HashMap<TypeId, Box<dyn OpaqueComponentStorage<I>>>,
 }
 
-impl<E: Eq + Hash + 'static> ComponentManager<E> {
+impl<I: Eq + Hash + 'static> ComponentManager<I> {
     // Entity stuff
-    fn c_get<C: 'static>(&self) -> Option<&HashMap<E, C>> {
+    fn c_get<C: 'static>(&self) -> Option<&ComponentStorage<I, C>> {
         self.storage.get(&TypeId::of::<C>()).map(|store| {
             store
                 .as_any()
-                .downcast_ref::<HashMap<E, C>>()
+                .downcast_ref::<ComponentStorage<I, C>>()
                 .expect("Error: type mismatch")
         })
     }
 
     // Components stuff
-    pub(crate) fn c_get_mut<C: 'static>(&mut self) -> Option<&mut HashMap<E, C>> {
+    pub(crate) fn c_get_mut<C: 'static>(&mut self) -> Option<&mut ComponentStorage<I, C>> {
         self.storage.get_mut(&TypeId::of::<C>()).map(|store| {
             store
                 .as_any_mut()
-                .downcast_mut::<HashMap<E, C>>()
+                .downcast_mut::<ComponentStorage<I, C>>()
                 .expect("Error: type mismatch")
         })
     }
 
-    fn c_get_or_default<C: 'static>(&mut self) -> &mut HashMap<E, C> {
+    fn c_get_or_default<C: 'static>(&mut self) -> &mut ComponentStorage<I, C> {
         self.storage
             .entry(TypeId::of::<C>())
-            .or_insert(Box::new(HashMap::<E, C>::new()))
+            .or_insert(Box::new(ComponentStorage::<I, C>::default()))
             .as_any_mut()
             .downcast_mut()
             .expect("Error: type mismatch")
     }
 
-    pub fn get<C: 'static>(&self, entity: &E) -> Option<&C> {
+    pub fn get<C: 'static>(&self, entity: &I) -> Option<&C> {
         self.c_get::<C>().and_then(|c| c.get(entity))
     }
 
-    pub fn get_mut<C: 'static>(&mut self, entity: &E) -> Option<&mut C> {
+    pub fn get_mut<C: 'static>(&mut self, entity: &I) -> Option<&mut C> {
         self.c_get_mut::<C>().and_then(|c| c.get_mut(entity))
     }
 
-    pub fn insert<C: 'static>(&mut self, entity: E, component: C) -> Option<C> {
+    pub fn insert<C: 'static>(&mut self, entity: I, component: C) -> Option<C> {
         self.c_get_or_default::<C>().insert(entity, component)
     }
 
-    pub fn remove<C: 'static>(&mut self, entity: &E) -> Option<C> {
-        self.c_get_mut::<C>().and_then(|c| c.remove(entity))
-    }
+    // pub fn remove<C: 'static>(&mut self, entity: &I) -> Option<C> {
+    //     self.c_get_mut::<C>().and_then(|c| c.remove(entity))
+    // }
 
-    pub fn remove_entity(&mut self, entity: &E) {
+    pub fn remove_entity(&mut self, entity: &I) {
         self.storage.retain(|_, store| {
             store.remove(entity);
             !store.is_empty()

@@ -1,43 +1,46 @@
-pub struct EntityManager<E> {
-    active: Vec<E>,
-    free: Vec<E>,
-    generator: Box<dyn FnMut() -> E>,
+use std::ops::RangeFrom;
+
+pub(crate) struct EntityManager<I, G> {
+    alive: Vec<I>,
+    dead: Vec<I>,
+    generator: G,
 }
 
-impl<E: Eq> EntityManager<E> {
-    pub fn new(generator: Box<dyn FnMut() -> E>) -> Self {
-        Self {
-            active: vec![],
-            free: vec![],
-            generator,
-        }
+impl<I: Copy + PartialEq, G: Iterator<Item = I>> EntityManager<I, G> {
+    pub fn contains(&self, id: I) -> bool {
+        self.alive.contains(&id)
     }
 
-    pub fn contains(&self, entity: &E) -> bool {
-        self.active.contains(entity)
+    pub fn spawn(&mut self) -> I {
+        let id = self
+            .dead
+            .pop()
+            .unwrap_or_else(|| self.generator.next().expect("no available entity IDs"));
+
+        self.alive.push(id);
+
+        id
     }
 
-    pub fn spawn(&mut self) -> &E {
-        let e = self.free.pop().unwrap_or_else(|| self.generator.as_mut()());
-        self.active.push(e);
-        self.active.last().unwrap()
-    }
+    pub fn despawn(&mut self, id: I) {
+        let i = self
+            .alive
+            .iter()
+            .position(|other| *other == id)
+            .expect("Despawning an invalid entity");
+        self.alive.swap_remove(i);
 
-    pub fn despawn(&mut self, entity: &E) -> bool {
-        match self.active.iter().position(|e| e == entity) {
-            Some(i) => {
-                self.free.push(self.active.swap_remove(i));
-                true
-            }
-            None => false,
-        }
+        self.dead.push(id);
     }
 }
 
-impl Default for EntityManager<usize> {
+impl Default for EntityManager<usize, RangeFrom<usize>> {
     fn default() -> Self {
-        let mut it = 0usize..;
-        Self::new(Box::new(move || it.next().expect("Error: out of entities")))
+        Self {
+            alive: vec![],
+            dead: vec![],
+            generator: 0..,
+        }
     }
 }
 
@@ -48,26 +51,29 @@ mod tests {
     #[test]
     fn test_spawn_despawn() {
         let mut manager = EntityManager::default();
+        assert_eq!(manager.alive.len(), 0);
+        assert_eq!(manager.dead.len(), 0);
 
-        assert_eq!(manager.active.len(), 0);
-        assert_eq!(manager.free.len(), 0);
+        let id = manager.spawn();
+        assert_eq!(id, 0);
+        assert_eq!(manager.contains(id), true);
 
-        let e = *manager.spawn();
+        assert_eq!(manager.alive.len(), 1);
+        assert_eq!(manager.dead.len(), 0);
 
-        assert_eq!(e, 0);
-        assert_eq!(manager.active.len(), 1);
-        assert_eq!(manager.free.len(), 0);
+        manager.despawn(id);
+        assert_eq!(manager.contains(id), false);
 
-        manager.despawn(&e);
-
-        assert_eq!(manager.active.len(), 0);
-        assert_eq!(manager.free.len(), 1);
+        assert_eq!(manager.alive.len(), 0);
+        assert_eq!(manager.dead.len(), 1);
     }
 
     #[test]
-    fn test_bad_despawn() {
+    #[should_panic = "Despawning an invalid entity"]
+    fn test_spawn_double_free() {
         let mut manager = EntityManager::default();
-
-        assert!(!manager.despawn(&3));
+        let e = manager.spawn();
+        manager.despawn(e);
+        manager.despawn(e);
     }
 }
