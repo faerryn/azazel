@@ -10,7 +10,7 @@ impl<I: Copy + Eq + Hash, C> ComponentStorage<I, C> {
     pub(crate) fn get(&self, id: &I) -> Option<&C> {
         self.id_to_index
             .get(id)
-            .map(|i| self.components.get(*i).expect("Id maps to invalid index"))
+            .map(|i| self.components.get(*i).expect("ID maps to invalid index"))
     }
 
     pub(crate) fn as_slice(&self) -> &[C] {
@@ -25,7 +25,7 @@ impl<I: Copy + Eq + Hash, C> ComponentStorage<I, C> {
         self.id_to_index.get(id).map(|i| {
             self.components
                 .get_mut(*i)
-                .expect("Id maps to invalid index")
+                .expect("ID maps to invalid index")
         })
     }
 
@@ -46,26 +46,13 @@ impl<I: Copy + Eq + Hash, C> ComponentStorage<I, C> {
         let last_index = self.components.len() - 1;
         if let Some(i) = self.id_to_index.remove(id) {
             if i < last_index {
-                let last_id = self
-                    .index_to_id
-                    .pop()
-                    .expect("Non-empty storage has empty index_to_id");
+                let last_id = self.index_to_id.pop().expect("Empty index_to_id");
                 let previous_index = self.id_to_index.insert(last_id, i);
-                assert_eq!(
-                    previous_index,
-                    Some(last_index),
-                    "last_id should mapped to last_index before"
-                );
+                assert_eq!(previous_index, Some(last_index), "Bijection broken");
                 Some(self.components.swap_remove(i))
             } else {
-                self.index_to_id
-                    .pop()
-                    .expect("Non-empty storage has empty index_to_id");
-                Some(
-                    self.components
-                        .pop()
-                        .expect("Empty storage has non-empty id_to_index"),
-                )
+                self.index_to_id.pop().expect("Empty index_to_id");
+                Some(self.components.pop().expect("Empty components"))
             }
         } else {
             None
@@ -86,7 +73,7 @@ impl<I, C> Default for ComponentStorage<I, C> {
 pub(crate) trait OpaqueComponentStorage<I> {
     fn is_empty(&self) -> bool;
     fn len(&self) -> usize;
-    fn remove(&mut self, id: &I);
+    fn delete(&mut self, id: &I);
     fn shrink_to_fit(&mut self);
 }
 
@@ -99,10 +86,8 @@ impl<I: Eq + Hash, C> OpaqueComponentStorage<I> for ComponentStorage<I, C> {
         self.id_to_index.len()
     }
 
-    fn remove(&mut self, id: &I) {
-        self.id_to_index
-            .remove(id)
-            .expect("Tried to remove non-existent component");
+    fn delete(&mut self, id: &I) {
+        self.remove(id);
     }
 
     fn shrink_to_fit(&mut self) {
@@ -115,6 +100,7 @@ impl<I: Eq + Hash, C> OpaqueComponentStorage<I> for ComponentStorage<I, C> {
 pub(crate) trait AnyComponentStorage<I>: OpaqueComponentStorage<I> {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
+    fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
 
 impl<I: Eq + Hash + 'static, C: 'static> AnyComponentStorage<I> for ComponentStorage<I, C> {
@@ -123,6 +109,10 @@ impl<I: Eq + Hash + 'static, C: 'static> AnyComponentStorage<I> for ComponentSto
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self
     }
 }

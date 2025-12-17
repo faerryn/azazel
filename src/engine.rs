@@ -13,15 +13,43 @@ pub struct Engine<I, G> {
 }
 
 impl<I: Copy + Eq + Hash + 'static, G: Iterator<Item = I>> Engine<I, G> {
-    pub fn spawn<C: 'static>(&mut self, component: C) -> Entity<I> {
+    pub fn spawn<C: 'static>(&mut self) -> Entity<I> {
         let id = self.entity_manager.spawn();
-        self.component_manager.insert(id, component);
         Entity { id }
     }
 
     pub fn despawn(&mut self, entity: Entity<I>) {
-        self.component_manager.remove_entity(&entity.id);
+        self.component_manager.delete_entity_components(&entity.id);
         self.entity_manager.despawn(entity.id)
+    }
+
+    pub fn insert_entity_component<C: 'static>(
+        &mut self,
+        entity: &Entity<I>,
+        component: C,
+    ) -> Option<C> {
+        if !self.entity_manager.contains(entity.id) {
+            panic!("Invalid entity");
+        }
+        self.component_manager.insert(entity.id, component)
+    }
+
+    pub fn remove_entity_component<C: 'static>(&mut self, entity: &Entity<I>) -> Option<C> {
+        if !self.entity_manager.contains(entity.id) {
+            panic!("Invalid entity");
+        }
+        self.component_manager.remove(&entity.id)
+    }
+
+    pub fn get_entity_component<C: 'static>(&self, entity: &Entity<I>) -> Option<&C> {
+        if !self.entity_manager.contains(entity.id) {
+            panic!("Invalid entity");
+        }
+        self.component_manager.get(&entity.id)
+    }
+
+    pub fn delete_component_for_all_entities<C: 'static>(&mut self) {
+        self.component_manager.remove_store::<C>();
     }
 
     pub fn schedule<C: 'static, S: Fn(&mut [C]) + 'static>(&mut self, system: S) {
@@ -30,10 +58,6 @@ impl<I: Copy + Eq + Hash + 'static, G: Iterator<Item = I>> Engine<I, G> {
 
     pub fn run_systems(&mut self) {
         self.system_manager.run_systems(&mut self.component_manager);
-    }
-
-    pub fn entity_get_component<C: 'static>(&self, entity: &Entity<I>) -> Option<&C> {
-        self.component_manager.get(&entity.id)
     }
 }
 

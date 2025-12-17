@@ -15,7 +15,7 @@ impl<I: Copy + PartialEq, G: Iterator<Item = I>> EntityManager<I, G> {
         let id = self
             .dead
             .pop()
-            .unwrap_or_else(|| self.generator.next().expect("no available entity IDs"));
+            .unwrap_or_else(|| self.generator.next().expect("Out of entity IDs"));
 
         self.alive.push(id);
 
@@ -27,7 +27,7 @@ impl<I: Copy + PartialEq, G: Iterator<Item = I>> EntityManager<I, G> {
             .alive
             .iter()
             .position(|other| *other == id)
-            .expect("Despawning an invalid entity");
+            .expect("Invalid entity ID");
         self.alive.swap_remove(i);
 
         self.dead.push(id);
@@ -69,7 +69,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic = "Despawning an invalid entity"]
+    #[should_panic = "Invalid entity ID"]
     fn test_spawn_double_free() {
         let mut manager = EntityManager::default();
         let e = manager.spawn();

@@ -2,64 +2,66 @@ use std::{any::TypeId, collections::HashMap, hash::Hash};
 
 use crate::component_storage::{AnyComponentStorage, ComponentStorage};
 
-pub struct ComponentManager<I> {
+pub(crate) struct ComponentManager<I> {
     stores: HashMap<TypeId, Box<dyn AnyComponentStorage<I>>>,
 }
 
 impl<I: Copy + Eq + Hash + 'static> ComponentManager<I> {
-    // Entity stuff
-    fn c_get<C: 'static>(&self) -> Option<&ComponentStorage<I, C>> {
+    pub(crate) fn get_store<C: 'static>(&self) -> Option<&ComponentStorage<I, C>> {
         self.stores.get(&TypeId::of::<C>()).map(|store| {
             store
                 .as_any()
                 .downcast_ref::<ComponentStorage<I, C>>()
-                .expect("Error: type mismatch")
+                .expect("Type mismatch")
         })
     }
 
-    // Components stuff
-    pub(crate) fn c_get_mut<C: 'static>(&mut self) -> Option<&mut ComponentStorage<I, C>> {
+    pub(crate) fn get_mut_store<C: 'static>(&mut self) -> Option<&mut ComponentStorage<I, C>> {
         self.stores.get_mut(&TypeId::of::<C>()).map(|store| {
             store
                 .as_any_mut()
                 .downcast_mut::<ComponentStorage<I, C>>()
-                .expect("Error: type mismatch")
+                .expect("Type mismatch")
         })
     }
 
-    fn c_get_or_default<C: 'static>(&mut self) -> &mut ComponentStorage<I, C> {
+    pub(crate) fn get<C: 'static>(&self, entity: &I) -> Option<&C> {
+        self.get_store::<C>().and_then(|c| c.get(entity))
+    }
+
+    pub(crate) fn get_mut<C: 'static>(&mut self, entity: &I) -> Option<&mut C> {
+        self.get_mut_store::<C>().and_then(|c| c.get_mut(entity))
+    }
+
+    pub(crate) fn insert<C: 'static>(&mut self, entity: I, component: C) -> Option<C> {
         self.stores
             .entry(TypeId::of::<C>())
             .or_insert(Box::new(ComponentStorage::<I, C>::default()))
             .as_any_mut()
-            .downcast_mut()
-            .expect("Error: type mismatch")
+            .downcast_mut::<ComponentStorage<I, C>>()
+            .expect("Type mismatch")
+            .insert(entity, component)
     }
 
-    pub fn get<C: 'static>(&self, entity: &I) -> Option<&C> {
-        self.c_get::<C>().and_then(|c| c.get(entity))
+    pub(crate) fn remove<C: 'static>(&mut self, entity: &I) -> Option<C> {
+        self.get_mut_store::<C>().and_then(|c| c.remove(entity))
     }
 
-    pub fn get_mut<C: 'static>(&mut self, entity: &I) -> Option<&mut C> {
-        self.c_get_mut::<C>().and_then(|c| c.get_mut(entity))
-    }
-
-    pub fn insert<C: 'static>(&mut self, entity: I, component: C) -> Option<C> {
-        self.c_get_or_default::<C>().insert(entity, component)
-    }
-
-    pub fn remove<C: 'static>(&mut self, entity: &I) -> Option<C> {
-        self.c_get_mut::<C>().and_then(|c| c.remove(entity))
-    }
-
-    pub fn remove_entity(&mut self, entity: &I) {
+    pub(crate) fn delete_entity_components(&mut self, entity: &I) {
         self.stores.retain(|_, store| {
-            store.remove(entity);
+            store.delete(entity);
             !store.is_empty()
         });
     }
 
-    pub fn shrink_to_fit(&mut self) {
+    pub(crate) fn remove_store<C: 'static>(&mut self) -> Option<ComponentStorage<I, C>> {
+        // NOTE: removing non-existent stores is allowed
+        self.stores
+            .remove(&TypeId::of::<C>())
+            .map(|any| *(any.into_any().downcast().expect("Type mismatch")))
+    }
+
+    pub(crate) fn shrink_to_fit(&mut self) {
         for store in self.stores.values_mut() {
             store.shrink_to_fit();
         }
