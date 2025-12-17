@@ -59,9 +59,13 @@ impl<I: Copy + Eq + Hash + 'static, G: Iterator<Item = I>> Engine<I, G> {
     pub fn run_systems(&mut self) {
         self.system_manager.run_systems(&mut self.component_manager);
     }
+
+    pub fn shrink_to_fit(&mut self) {
+        self.component_manager.shrink_to_fit();
+    }
 }
 
-impl Default for Engine<usize, RangeFrom<usize>> {
+impl Default for Engine<u32, RangeFrom<u32>> {
     fn default() -> Self {
         Self {
             entity_manager: EntityManager::default(),

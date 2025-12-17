@@ -34,12 +34,12 @@ impl<I: Copy + PartialEq, G: Iterator<Item = I>> EntityManager<I, G> {
     }
 }
 
-impl Default for EntityManager<usize, RangeFrom<usize>> {
+impl<Idx: PartialOrd<Idx> + Default> Default for EntityManager<Idx, RangeFrom<Idx>> {
     fn default() -> Self {
         Self {
             alive: vec![],
             dead: vec![],
-            generator: 0..,
+            generator: Idx::default()..,
         }
     }
 }
@@ -54,7 +54,7 @@ mod tests {
         assert_eq!(manager.alive.len(), 0);
         assert_eq!(manager.dead.len(), 0);
 
-        let id = manager.spawn();
+        let id: i32 = manager.spawn();
         assert_eq!(id, 0);
         assert_eq!(manager.contains(id), true);
 
@@ -72,7 +72,7 @@ mod tests {
     #[should_panic = "Invalid entity ID"]
     fn test_spawn_double_free() {
         let mut manager = EntityManager::default();
-        let e = manager.spawn();
+        let e: u8 = manager.spawn();
         manager.despawn(e);
         manager.despawn(e);
     }
