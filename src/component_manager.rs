@@ -72,22 +72,19 @@ impl<Id: Copy + Eq + Hash + 'static> ComponentManager<Id> {
         self.stores.retain(|_, store| !store.is_empty());
     }
 
-    fn sample_mut_store(
+    fn sample_mut_store<const N: usize>(
         &mut self,
-        query: &[TypeId],
-    ) -> Vec<Option<&mut Box<dyn AnyComponentStorage<Id>>>> {
+        query: [TypeId; N],
+    ) -> [Option<&mut Box<dyn AnyComponentStorage<Id>>>; N] {
         let mut unsorted: HashMap<_, _> = self.stores.iter_mut().collect();
-        let mut results = vec![];
-        for c in query {
-            results.push(unsorted.remove(c));
-        }
-        results
+        std::array::from_fn(|i| unsorted.remove(&query[i]))
     }
 
     pub(crate) fn query<const N: usize>(&mut self, query: [TypeId; N]) -> Vec<[&mut dyn Any; N]> {
         if N == 0 {
             return vec![];
         }
+
         let mut set: Option<HashSet<Id>> = None;
         for c in &query {
             if let Some(store) = self.stores.get(c) {
@@ -111,7 +108,7 @@ impl<Id: Copy + Eq + Hash + 'static> ComponentManager<Id> {
         let ids: Vec<Id> = set.into_iter().collect();
         let mut all: Vec<Vec<_>> = vec![];
         for store in self
-            .sample_mut_store(&query)
+            .sample_mut_store(query)
             .into_iter()
             .map(|store| store.expect("Store missing"))
         {
