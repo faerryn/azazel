@@ -16,8 +16,8 @@ impl<Id: Copy + Eq + Hash + 'static> SystemManager<Id> {
         self.systems.push(Box::new(system.into_opaque_system()))
     }
 
-    pub fn run_systems(&self, component_manager: &mut ComponentManager<Id>) {
-        for system in &self.systems {
+    pub fn run_systems(&mut self, component_manager: &mut ComponentManager<Id>) {
+        for system in &mut self.systems {
             system.run(component_manager);
         }
     }
@@ -35,56 +35,47 @@ pub(crate) trait IntoOpaqueSystem<Id, Input> {
 }
 
 trait OpaqueSystem<Id> {
-    fn run(&self, component_manager: &mut ComponentManager<Id>);
+    fn run(&mut self, component_manager: &mut ComponentManager<Id>);
 }
 
-impl<Id: Copy + Eq + Hash + 'static, C: 'static, F: Fn(&mut C) + 'static> IntoOpaqueSystem<Id, (C,)>
-    for F
-{
-    type System = System<(C,), F>;
-
-    fn into_opaque_system(self) -> Self::System {
-        Self::System {
-            call: self,
-            _signature: PhantomData,
+macro_rules! impl_into_opaque_system {
+    ($($($params:ident),+)?) => {
+        impl<
+            Id: Copy + Eq + Hash + 'static,
+            F: FnMut($($(&mut $params),+)?) + 'static,
+            $($($params: 'static),+)?
+        > IntoOpaqueSystem<Id, ($($($params),+,)?)> for F
+        {
+            type System = System<($($($params),+,)?), F>;
+            fn into_opaque_system(self) -> Self::System {
+                Self::System {
+                    call: self,
+                    _signature: PhantomData,
+                }
+            }
         }
-    }
-}
-
-impl<Id: Copy + Eq + Hash + 'static, C: 'static, D: 'static, F: Fn(&mut C, &mut D) + 'static>
-    IntoOpaqueSystem<Id, (C, D)> for F
-{
-    type System = System<(C, D), F>;
-
-    fn into_opaque_system(self) -> Self::System {
-        Self::System {
-            call: self,
-            _signature: PhantomData,
-        }
-    }
-}
-
-impl<Id: Copy + Eq + Hash + 'static, C: 'static, F: Fn(&mut C) + 'static> OpaqueSystem<Id>
-    for System<(C,), F>
-{
-    fn run(&self, component_manager: &mut ComponentManager<Id>) {
-        if let Some(components) = component_manager.get_mut_store::<C>() {
-            for c in components.as_mut_slice() {
-                (self.call)(c);
+    impl<
+        Id: Copy + Eq + Hash + 'static,
+        F: FnMut($($(&mut $params),+)?) + 'static,
+        $($($params: 'static),+)?
+        >
+        OpaqueSystem<Id> for System<($($($params),+,)?), F>
+    {
+        fn run(&mut self, component_manager: &mut ComponentManager<Id>) {
+            let result = component_manager.query([
+                $($(TypeId::of::<$params>()),+)?
+            ]);
+            for [$($($params),+)?] in result {
+                (self.call)($($($params.downcast_mut().unwrap()),+)?);
             }
         }
     }
+
+    };
 }
 
-impl<Id: Copy + Eq + Hash + 'static, C: 'static, D: 'static, F: Fn(&mut C, &mut D) + 'static>
-    OpaqueSystem<Id> for System<(C, D), F>
-{
-    fn run(&self, component_manager: &mut ComponentManager<Id>) {
-        let mut result = component_manager.query(&[TypeId::of::<C>(), TypeId::of::<D>()]);
-        let ds = result.pop().unwrap();
-        let cs = result.pop().unwrap();
-        for (c, d) in cs.into_iter().zip(ds) {
-            (self.call)(c.downcast_mut().unwrap(), d.downcast_mut().unwrap());
-        }
-    }
-}
+impl_into_opaque_system!();
+impl_into_opaque_system!(T1);
+impl_into_opaque_system!(T1, T2);
+impl_into_opaque_system!(T1, T2, T3);
+impl_into_opaque_system!(T1, T2, T3, T4);

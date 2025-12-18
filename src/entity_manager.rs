@@ -7,11 +7,15 @@ pub(crate) struct EntityManager<Id, G> {
 }
 
 impl<Id: Copy + PartialEq, G: Iterator<Item = Id>> EntityManager<Id, G> {
-    pub fn contains(&self, id: Id) -> bool {
+    pub(crate) fn as_slice(&self) -> &[Id] {
+        self.alive.as_slice()
+    }
+
+    pub(crate) fn contains(&self, id: Id) -> bool {
         self.alive.contains(&id)
     }
 
-    pub fn spawn(&mut self) -> Id {
+    pub(crate) fn spawn(&mut self) -> Id {
         let id = self
             .dead
             .pop()
@@ -22,7 +26,7 @@ impl<Id: Copy + PartialEq, G: Iterator<Item = Id>> EntityManager<Id, G> {
         id
     }
 
-    pub fn despawn(&mut self, id: Id) {
+    pub(crate) fn despawn(&mut self, id: Id) {
         let i = self
             .alive
             .iter()
@@ -34,12 +38,12 @@ impl<Id: Copy + PartialEq, G: Iterator<Item = Id>> EntityManager<Id, G> {
     }
 }
 
-impl<Idx: PartialOrd<Idx> + Default> Default for EntityManager<Idx, RangeFrom<Idx>> {
+impl<Id: PartialOrd<Id> + Default> Default for EntityManager<Id, RangeFrom<Id>> {
     fn default() -> Self {
         Self {
             alive: vec![],
             dead: vec![],
-            generator: Idx::default()..,
+            generator: Id::default()..,
         }
     }
 }

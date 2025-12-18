@@ -84,47 +84,56 @@ impl<Id: Copy + Eq + Hash + 'static> ComponentManager<Id> {
         results
     }
 
-    pub(crate) fn query(&mut self, query: &[TypeId]) -> Vec<Vec<&mut dyn Any>> {
-        match query {
-            [] => vec![],
-            [q1, tail @ ..] => {
-                if let Some(s1) = self.stores.get(q1) {
-                    let mut set: HashSet<Id> = s1.ids().iter().copied().collect();
-                    for c in tail {
-                        if let Some(store) = self.stores.get(c) {
-                            let set2: HashSet<Id> = store.ids().iter().copied().collect();
-                            set = set.intersection(&set2).copied().collect();
-                        } else {
-                            return vec![];
-                        }
-                    }
-
-                    let ids: Vec<Id> = set.into_iter().collect();
-                    let mut all = vec![];
-                    for store in self
-                        .sample_mut_store(query)
-                        .into_iter()
-                        .map(|store| store.expect("Store missing"))
-                    {
-                        all.push(
-                            store
-                                .sample_mut_any(&ids)
-                                .into_iter()
-                                .map(|c| c.expect("Broken store"))
-                                .collect(),
-                        );
-                    }
-
-                    all
+    pub(crate) fn query<const N: usize>(&mut self, query: [TypeId; N]) -> Vec<[&mut dyn Any; N]> {
+        if N == 0 {
+            return vec![];
+        }
+        let mut set: Option<HashSet<Id>> = None;
+        for c in &query {
+            if let Some(store) = self.stores.get(c) {
+                let s2: HashSet<Id> = store.ids().iter().copied().collect();
+                if let Some(s1) = set {
+                    set = Some(s1.intersection(&s2).copied().collect());
                 } else {
-                    vec![]
+                    set = Some(s2);
                 }
+            } else {
+                return vec![];
             }
         }
+
+        let set = if let Some(set) = set {
+            set
+        } else {
+            return vec![];
+        };
+
+        let ids: Vec<Id> = set.into_iter().collect();
+        let mut all: Vec<Vec<_>> = vec![];
+        for store in self
+            .sample_mut_store(&query)
+            .into_iter()
+            .map(|store| store.expect("Store missing"))
+        {
+            all.push(
+                store
+                    .sample_mut_any(&ids)
+                    .into_iter()
+                    .map(|c| c.expect("Broken store"))
+                    .collect(),
+            );
+        }
+        let mut transpose = vec![];
+        for _ in 0..ids.len() {
+            let per_entity: [&mut dyn Any; N] = std::array::from_fn(|j| all[j].pop().unwrap());
+            transpose.push(per_entity);
+        }
+
+        transpose
     }
 }
 
-impl<Id> Default for ComponentManager<Id> {
+impl<Id: PartialOrd<Id> + Default> Default for ComponentManager<Id> {
     fn default() -> Self {
         Self {
             stores: HashMap::new(),
@@ -135,9 +144,6 @@ impl<Id> Default for ComponentManager<Id> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-    struct StringID(&'static str);
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct Position(i32, i32);
@@ -150,7 +156,7 @@ mod tests {
     #[test]
     fn insert_get() {
         let mut manager = ComponentManager::default();
-        let player = StringID("Player");
+        let player = "Player";
         let position = Position(3, -5);
 
         assert_eq!(manager.stores.len(), 0);
@@ -168,15 +174,15 @@ mod tests {
         let player = "Player";
         let position = Position(3, -5);
 
-        let npc = "Gale";
+        let gale = "Gale";
         let dialogue = Dialogue {
             greeting: "The Orb.".to_string(),
         };
 
         manager.insert(player, position);
-        manager.insert(npc, dialogue);
+        manager.insert(gale, dialogue);
 
-        assert_eq!(manager.get::<Position>(&npc), None);
+        assert_eq!(manager.get::<Position>(&gale), None);
         assert_eq!(manager.get::<Dialogue>(&player), None);
     }
 
@@ -185,9 +191,9 @@ mod tests {
         let manager = ComponentManager::default();
 
         let player = "Player";
-        let npc = "Gale";
+        let gale = "Gale";
 
-        assert_eq!(manager.get::<Position>(&npc), None);
+        assert_eq!(manager.get::<Position>(&gale), None);
         assert_eq!(manager.get::<Dialogue>(&player), None);
     }
 
@@ -198,24 +204,24 @@ mod tests {
         let player = "Player";
         let position = Position(3, -5);
 
-        let npc = "Gale";
+        let gale = "Gale";
         let dialogue = Dialogue {
             greeting: "The Orb.".to_string(),
         };
 
         manager.insert(player, position);
-        manager.insert(npc, dialogue);
+        manager.insert(gale, dialogue);
 
         let new_dialogue = Dialogue {
             greeting: "The Karsite Weave.".to_string(),
         };
 
         {
-            let dialogue_mut = manager.get_mut::<Dialogue>(&npc).unwrap();
+            let dialogue_mut = manager.get_mut::<Dialogue>(&gale).unwrap();
             *dialogue_mut = new_dialogue.clone();
         }
 
-        assert_eq!(manager.get::<Dialogue>(&npc), Some(&new_dialogue));
+        assert_eq!(manager.get::<Dialogue>(&gale), Some(&new_dialogue));
     }
 
     #[test]
